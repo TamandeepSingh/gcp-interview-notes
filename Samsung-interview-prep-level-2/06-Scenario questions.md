@@ -1,375 +1,229 @@
-Perfect — these are **exact Samsung-style practical scenarios**.  
-You need to answer them like a **problem-solving engineer**, not just theory.
+# Scenario Questions + Structured Answers
 
-I’ll give you **structured answers (Step-by-step thinking \+ commands \+ reasoning)** 👇
+## Answer Framework (Use Every Time)
 
----
-
-# **🚀 🔥 SCENARIO 1: Pod cannot access internet**
-
----
-
-## **❓ Question:**
-
-Your pod is running but cannot access external APIs (internet). How do you debug?
+1. **Identify the layer** — "First I confirm where the issue is..."
+2. **Step-by-step debugging** — "Then I check pods, services..."
+3. **Show real commands**
+4. **Root cause thinking** — "Possible reasons include..."
+5. **Resolution** — "Then I fix by..."
 
 ---
 
-## **✅ Strong Answer:**
+## Scenario 1: Pod Cannot Access Internet
 
-First, I verify whether the issue is inside the pod or at the network level.
+**Question:** Your pod is running but cannot access external APIs (internet). How do you debug?
 
----
+**Answer:**
 
-### **🧠 Step-by-step approach:**
+First, verify whether the issue is inside the pod or at the network level.
 
-### **1\. Exec into pod**
+```bash
+# Step 1: Exec into pod
+kubectl exec -it <pod> -- sh
 
-kubectl exec \-it \<pod\> \-- sh
-
-### **2\. Test connectivity**
-
-ping google.com  
+# Step 2: Test connectivity
+ping google.com
 curl https://google.com
 
----
-
-### **3\. Check DNS**
-
+# Step 3: Check DNS
 nslookup google.com
+# If DNS fails → CoreDNS issue
+```
 
-👉 If DNS fails → CoreDNS issue
-
----
-
-### **4\. Check Network Policies**
-
+```bash
+# Step 4: Check Network Policies
 kubectl get networkpolicy
+# Look for egress rules that may be blocking outbound traffic
+```
 
-👉 Maybe egress blocked
+**Step 5: Check NAT configuration**
+In GKE private clusters, pods need Cloud NAT configured for internet access. Verify NAT gateway exists and covers the subnet.
 
----
-
-### **5\. Check NAT / GCP config**
-
-In GKE private clusters, pods need Cloud NAT for internet access.
-
----
-
-## **🎯 Final Answer Line:**
-
-I isolate whether it's DNS, network policy, or NAT configuration, and verify each layer step-by-step from inside the pod to cluster networking.
+**Closing line:**
+> "I isolate whether it's DNS, network policy, or NAT configuration, and verify each layer step-by-step from inside the pod to cluster networking."
 
 ---
 
-# **🚀 🔥 SCENARIO 2: App deployed but not accessible**
+## Scenario 2: App Deployed But Not Accessible
 
----
+**Question:** App is deployed but not reachable externally. What do you check?
 
-## **❓ Question:**
+**Answer:**
 
-App is deployed but not reachable externally. What do you check?
+Debug layer by layer: Pod → Service → Ingress → Load Balancer.
 
----
-
-## **✅ Strong Answer:**
-
-I debug layer by layer: Pod → Service → Ingress → Load Balancer.
-
----
-
-### **🧠 Steps:**
-
----
-
-### **1\. Check pods**
-
+```bash
+# Step 1: Check pods
 kubectl get pods
+# Are they Running AND Ready?
 
-👉 Running? Ready?
-
----
-
-### **2\. Check service**
-
-kubectl get svc  
-kubectl describe svc \<service\>
-
-👉 Verify:
-
-* selector labels  
-* ports
-
----
-
-### **3\. Check endpoints**
-
-kubectl get endpoints
-
-👉 If empty → label mismatch
-
----
-
-### **4\. Check ingress**
-
-kubectl get ingress  
-kubectl describe ingress
-
----
-
-### **5\. Check LB IP**
-
+# Step 2: Check service
 kubectl get svc
+kubectl describe svc <service>
+# Verify: selector labels, ports, type
+
+# Step 3: Check endpoints
+kubectl get endpoints
+# If empty → label mismatch between service selector and pod labels
+
+# Step 4: Check ingress
+kubectl get ingress
+kubectl describe ingress <name>
+# Verify: host rules, backend service name, port
+
+# Step 5: Check external IP
+kubectl get svc
+# Verify LoadBalancer IP is assigned and accessible
+```
+
+**Closing line:**
+> "I systematically validate each layer from pods to ingress to identify where the traffic is breaking."
 
 ---
 
-## **🎯 Final Answer Line:**
+## Scenario 3: Logs Not Reaching Elasticsearch
 
-I systematically validate each layer from pods to ingress to identify where the traffic is breaking.
+**Question:** Logs are not appearing in Elasticsearch. How do you debug?
 
----
+**Answer:**
 
-# **🚀 🔥 SCENARIO 3: Logs not reaching Elasticsearch**
+Check the log pipeline end-to-end from source to destination.
 
----
+```bash
+# Step 1: Check Fluent Bit pods
+kubectl get pods -n logging
+kubectl logs <fluent-bit-pod>
 
-## **❓ Question:**
+# Step 2: Verify Fluent Bit config
+# - output plugin pointing to correct Logstash/ES endpoint?
+# - index name format correct?
+# - auth configured?
 
-Logs are not appearing in Elasticsearch. How do you debug?
+# Step 3: Network check
+curl http://elasticsearch:9200
 
----
+# Step 4: Check Elasticsearch indices
+curl http://elasticsearch:9200/_cat/indices
+```
 
-## **✅ Strong Answer:**
+**Common issues:**
+- Wrong index name format (date suffix mismatch)
+- Auth failure (API key or basic auth changed)
+- DNS failure (ES hostname not resolving)
+- Network policy blocking Fluent Bit → Elasticsearch traffic
 
-I check the log pipeline end-to-end from source to destination.
-
----
-
-### **🧠 Steps:**
-
----
-
-### **1\. Check Fluent Bit pods**
-
-kubectl get pods \-n logging  
-kubectl logs \<fluent-bit-pod\>
-
----
-
-### **2\. Verify config**
-
-Check:
-
-* output plugin  
-* ES endpoint  
-* index name
+**Closing line:**
+> "I trace logs from Fluent Bit to Elasticsearch, validating configuration, connectivity, and indexing issues."
 
 ---
 
-### **3\. Network check**
+## Scenario 4: Terraform Apply Destroying Resources
 
-curl \<elasticsearch-endpoint\>:9200
+**Question:** Terraform plan shows resource destruction unexpectedly. What do you do?
 
----
+**Answer:**
 
-### **4\. Check Elasticsearch**
+Do NOT apply immediately. First analyze why Terraform is planning destruction.
 
-GET \_cat/indices
-
----
-
-### **5\. Common issues**
-
-* wrong index format  
-* auth issue  
-* DNS failure
-
----
-
-## **🎯 Final Answer Line:**
-
-I trace logs from Fluent Bit to Elasticsearch, validating configuration, connectivity, and indexing issues.
-
----
-
-# **🚀 🔥 SCENARIO 4: Terraform apply destroying resources**
-
----
-
-## **❓ Question:**
-
-Terraform plan shows resource destruction unexpectedly. What do you do?
-
----
-
-## **✅ Strong Answer:**
-
-I do NOT apply immediately. I first analyze why Terraform is planning destruction.
-
----
-
-### **🧠 Steps:**
-
----
-
-### **1\. Check plan output**
-
+```bash
+# Step 1: Review plan output carefully
 terraform plan
 
----
-
-### **2\. Possible reasons:**
-
-* state mismatch  
-* manual changes (drift)  
-* config change  
-* resource renamed
-
----
-
-### **3\. Compare state**
-
+# Step 2: Check state
 terraform state list
 
----
+# Step 3: Compare state vs config
+terraform state show <resource>
+```
 
-### **4\. Fix options:**
+**Possible reasons:**
+- State mismatch (resource exists in infra but not in state)
+- Manual drift (resource changed outside Terraform)
+- Config change (attribute that forces recreation)
+- Resource renamed in code
 
-* import resource
+**Fix options:**
+```bash
+# Import existing resource into state
+terraform import <resource_type.name> <resource_id>
 
-terraform import
+# Or update config to match actual resource
+# Then re-run terraform plan to verify no destruction
+```
 
-* or update config
-
----
-
-## **🎯 Final Answer Line:**
-
-I always validate the plan, identify drift or config mismatch, and reconcile state before applying changes.
-
----
-
-# **🚀 🔥 SCENARIO 5: Pipeline passed but deployment failed**
-
----
-
-## **❓ Question:**
-
-CI pipeline passed, but deployment is broken. Why?
+**Closing line:**
+> "I always validate the plan, identify drift or config mismatch, and reconcile state before applying changes."
 
 ---
 
-## **✅ Strong Answer:**
+## Scenario 5: Pipeline Passed But Deployment Failed
 
-CI success doesn't guarantee deployment success. I check runtime issues.
+**Question:** CI pipeline passed, but deployment is broken. Why?
 
----
+**Answer:**
 
-### **🧠 Steps:**
+CI success doesn't guarantee deployment success. Check runtime issues.
 
----
+```bash
+# Step 1: Check what image tag is actually deployed
+kubectl describe deployment <name>
+# Compare image tag with what the pipeline built
 
-### **1\. Check image tag**
-
-Ensure deployed image \= built image
-
----
-
-### **2\. Check Kubernetes deployment**
-
-kubectl describe deployment  
+# Step 2: Check deployment status
 kubectl get pods
+kubectl describe deployment <name>
+
+# Step 3: Check pod logs
+kubectl logs <pod>
+
+# Step 4: Check ArgoCD (if used)
+# - sync status: is it OutOfSync?
+# - health status: degraded?
+```
+
+**Common issues:**
+- Image tag not updated in manifest
+- Wrong environment variables in deployment
+- Missing secrets (Secret not created in target namespace)
+- Config mismatch between environments
+- ArgoCD not synced to latest commit
+
+**Closing line:**
+> "I validate that the deployed image and configuration match the pipeline output, then debug runtime issues in Kubernetes."
 
 ---
 
-### **3\. Check logs**
+## Quick Reference: Debugging Commands
 
-kubectl logs \<pod\>
+```bash
+# Pod status
+kubectl get pods
+kubectl get pods -o wide
+kubectl describe pod <name>
+kubectl logs <pod>
+kubectl logs <pod> --previous    # previous container instance
+kubectl exec -it <pod> -- sh
 
----
+# Service / Network
+kubectl get svc
+kubectl get endpoints
+kubectl describe svc <name>
+kubectl get networkpolicy
 
-### **4\. ArgoCD check**
+# Deployment
+kubectl get deployment
+kubectl describe deployment <name>
+kubectl rollout status deployment/<name>
+kubectl rollout history deployment/<name>
 
-* sync status  
-* health status
+# Ingress
+kubectl get ingress
+kubectl describe ingress <name>
 
----
-
-### **5\. Common issues:**
-
-* wrong env vars  
-* wrong image tag  
-* secrets missing  
-* config mismatch
-
----
-
-## **🎯 Final Answer Line:**
-
-I validate that the deployed image and configuration match the pipeline output and debug runtime issues in Kubernetes.
-
----
-
-# **💥 BONUS: HOW TO ANSWER LIKE A PRO**
-
-Use this structure ALWAYS:
-
----
-
-### **🧠 1\. Clarify problem**
-
-“First I confirm where the issue is…”
-
----
-
-### **🔍 2\. Step-by-step debugging**
-
-“Then I check pods, services…”
-
----
-
-### **🛠️ 3\. Commands**
-
-Show real commands
-
----
-
-### **🎯 4\. Root cause thinking**
-
-“Possible reasons include…”
-
----
-
-### **✅ 5\. Resolution**
-
-“Then I fix by…”
-
----
-
-# **🚀 FINAL MENTOR PUSH**
-
-If you can:
-
-* Explain like this ✅  
-* Think in layers ✅  
-* Use commands naturally ✅
-
-👉 You will **crush the in-person round**
-
----
-
-# **🔥 NEXT LEVEL (Highly Recommended)**
-
-Let’s simulate:
-
-👉 I will give you:
-
-* broken cluster  
-* pressure questions  
-* follow-ups
-
-Say:  
-👉 **“Start final DevOps mock interview”**
-
-I’ll push you to **Samsung selection level** 💪
-
+# Terraform
+terraform plan
+terraform state list
+terraform state show <resource>
+terraform import <resource> <id>
+```

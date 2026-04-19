@@ -1,299 +1,220 @@
-Perfect — this is **THE most important skill** for your interview.  
-We’re going to do this like a **real Samsung interviewer**.
+# Broken Deployment — Mock Interview Scenarios
 
-⚠️ Rules:
+## Debugging Framework (Use Every Time)
 
-* You answer like you’re speaking in interview  
-* I will guide \+ correct you  
-* Focus on **thinking process, not just answer**
-
----
-
-# **🎯 🔥 SCENARIO 1: Broken Deployment (Real Interview Style)**
-
----
-
-### **👨‍💼 Interviewer:**
-
-Your application is deployed on GKE.  
-Pods are running, but the application is not accessible from the browser.
-
-Walk me through how you debug this.
+```
+1. Identify the layer    → pod / service / network / pipeline
+2. Step-by-step checks   → pods → service → endpoints → external access
+3. Show commands         → always state what you'd run
+4. Root cause thinking   → "Possible reasons are..."
+5. Resolution            → "I fix it by..."
+```
 
 ---
 
-## **👉 YOUR TURN (don’t scroll yet)**
+## Scenario 1: Pods Running But App Not Accessible
 
-Speak your answer like:
+**Interviewer:**
+> Your application is deployed on GKE. Pods are running, but the application is not accessible from the browser. Walk me through how you debug this.
 
-“First I would check…”
+**Ideal Answer:**
 
----
+First, I identify at which layer the issue is occurring — pod level, service level, or ingress/load balancer level.
 
----
-
-## **✅ IDEAL ANSWER (compare after you try)**
-
----
-
-### **🧠 Step-by-step (this is what they expect)**
-
-First, I would identify at which layer the issue is happening — whether it's pod level, service level, or ingress/load balancer level.
-
----
-
-### **🔍 Step 1: Check pods**
-
+```bash
+# Step 1: Verify pods are Running AND Ready
 kubectl get pods
 
-Ensure pods are running and ready.
+# Step 2: Check application logs for errors
+kubectl logs <pod>
 
----
-
-### **🔍 Step 2: Check logs**
-
-kubectl logs \<pod\>
-
-Verify application is running correctly.
-
----
-
-### **🔍 Step 3: Check service**
-
-kubectl get svc  
-kubectl describe svc \<service\>
-
-Validate:
-
-* selector labels  
-* ports  
-* type (LoadBalancer)
-
----
-
-### **🔍 Step 4: Check endpoints**
-
-kubectl get endpoints
-
-If empty → label mismatch
-
----
-
-### **🔍 Step 5: Check external IP**
-
+# Step 3: Inspect service configuration
 kubectl get svc
+kubectl describe svc <service>
+# Verify: selector labels, ports, type (LoadBalancer)
 
-Verify LoadBalancer IP is assigned
+# Step 4: Check endpoints
+kubectl get endpoints
+# If empty → label mismatch between selector and pod labels
 
----
+# Step 5: Verify external IP assigned
+kubectl get svc
+# Confirm EXTERNAL-IP is not <pending>
+```
 
-### **🎯 Final line (VERY IMPORTANT):**
-
-I debug layer by layer — pod → service → endpoints → external access — to isolate where traffic is breaking.
-
----
-
-# **🎯 🔥 SCENARIO 2: Broken Pipeline**
-
----
-
-### **👨‍💼 Interviewer:**
-
-Your GitHub Actions pipeline passed successfully, but the new version of the app is not reflected in Kubernetes.
-
-What could be wrong?
+**Closing line:**
+> "I debug layer by layer — pod → service → endpoints → external access — to isolate where traffic is breaking."
 
 ---
 
-## **👉 YOUR TURN**
+## Scenario 2: Pipeline Passed But New Version Not Deployed
 
----
+**Interviewer:**
+> Your GitHub Actions pipeline passed successfully, but the new version of the app is not reflected in Kubernetes. What could be wrong?
 
-## **✅ IDEAL ANSWER**
+**Ideal Answer:**
 
----
+First, I verify whether the new image was actually deployed to the cluster.
 
-### **🧠 Thought process:**
+```bash
+# Step 1: Check what image tag is running
+kubectl describe deployment <name>
+# Compare "Image:" field to the tag the pipeline built
 
-First, I would verify whether the new image was actually deployed.
-
----
-
-### **🔍 Step 1: Check image tag**
-
-kubectl describe deployment
-
-Compare image tag with pipeline build
-
----
-
-### **🔍 Step 2: Check rollout**
-
+# Step 2: Check rollout status
 kubectl rollout status deployment/my-app
 
----
+# Step 3: Look at deployment events
+kubectl describe deployment <name>
+```
 
-### **🔍 Step 3: Possible issues**
+**Possible issues:**
+- Image tag not updated in deployment manifest (pipeline didn't update YAML)
+- Deployment YAML not re-applied by pipeline
+- ArgoCD not synced to latest commit
+- `imagePullPolicy: IfNotPresent` serving a cached image
+- Wrong namespace — pipeline deployed to different namespace
 
-* image tag not updated  
-* deployment YAML not updated  
-* ArgoCD not synced  
-* caching issue
-
----
-
-### **🎯 Strong line:**
-
-CI success does not guarantee deployment success, so I always validate what is actually running in the cluster.
-
----
-
-# **🎯 🔥 SCENARIO 3: Pod CrashLoopBackOff**
+**Closing line:**
+> "CI success does not guarantee deployment success — I always validate what is actually running in the cluster."
 
 ---
 
-### **👨‍💼 Interviewer:**
+## Scenario 3: CrashLoopBackOff
 
-A pod is in CrashLoopBackOff. How do you debug?
+**Interviewer:**
+> A pod is in CrashLoopBackOff. How do you debug?
 
----
+**Ideal Answer:**
 
-## **👉 YOUR TURN**
+```bash
+# Step 1: Get events and container state
+kubectl describe pod <pod>
+# Events section shows: exit codes, last restart reason
 
----
+# Step 2: Get current logs
+kubectl logs <pod>
 
-## **✅ IDEAL ANSWER**
+# Step 3: Get logs from previous crashed container
+kubectl logs <pod> --previous
+```
 
----
+**Common reasons:**
+- App crash (unhandled exception, missing library)
+- Bad configuration (wrong env var, missing config file)
+- Missing environment variable or secret not mounted
+- Dependency not reachable (DB, external service)
+- Health probe too aggressive causing premature restart
 
-### **🧠 Step 1: Describe pod**
-
-kubectl describe pod \<pod\>
-
----
-
-### **🧠 Step 2: Check logs**
-
-kubectl logs \<pod\>
-
----
-
-### **🧠 Step 3: Common reasons**
-
-* app crash  
-* bad config  
-* missing env vars  
-* dependency failure
+**Closing line:**
+> "Logs and events are the fastest path to root cause — I always check both the current and previous container logs."
 
 ---
 
-### **🎯 Strong line:**
+## Scenario 4: Logs Not Reaching ELK
 
-Logs and events are the fastest way to identify why a pod is crashing.
+**Interviewer:**
+> Logs are not reaching Elasticsearch. What do you do?
 
----
+**Ideal Answer:**
 
-# **🎯 🔥 SCENARIO 4: Logs Not Reaching ELK (YOUR EXPERIENCE\!)**
+```bash
+# Step 1: Check Fluent Bit pod health
+kubectl get pods -n logging
+kubectl logs <fluent-bit-pod>
 
----
+# Step 2: Verify Fluent Bit output config
+# - output plugin type (http / es / loki)
+# - Logstash or ES endpoint correct?
+# - auth configured?
 
-### **👨‍💼 Interviewer:**
+# Step 3: Test network connectivity
+curl http://elasticsearch:9200
 
-Logs are not reaching Elasticsearch. What do you do?
+# Step 4: Check Elasticsearch indices
+curl http://elasticsearch:9200/_cat/indices
+# If index missing → index template or name format issue
+```
 
----
+**Common issues:**
+- Fluent Bit output plugin misconfigured
+- Network policy blocking egress from logging namespace
+- Elasticsearch cluster unhealthy (red/yellow status)
+- Index mapping conflict (field type changed between log versions)
+- Auth failure (changed API key not updated in Fluent Bit config)
 
-## **👉 YOUR TURN**
-
----
-
-## **✅ IDEAL ANSWER**
-
----
-
-### **🧠 Step-by-step:**
-
-1. Check Fluent Bit pods
-
-kubectl logs \<fluent-bit\>
-
-2. Verify config:  
-* output plugin  
-* ES endpoint  
-3. Test connectivity:
-
-curl elasticsearch:9200
-
-4. Check indices:
-
-GET \_cat/indices
+**Closing line:**
+> "I trace logs end-to-end from source to destination to identify exactly where the pipeline is breaking."
 
 ---
 
-### **🎯 Strong line:**
+## Scenario 5: Pod Running But Service Not Working
 
-I trace logs end-to-end from source to destination to identify where the pipeline is breaking.
+**Interviewer:**
+> Pod is running but service is not working. What do you check?
 
----
+**Ideal Answer:**
 
-# **🧠 🔥 HOW TO ANSWER (CRITICAL FRAMEWORK)**
+```bash
+# Step 1: Check service selector matches pod labels
+kubectl get pods --show-labels
+kubectl describe svc <service>
+# Compare "Selector:" with pod labels
 
-Use this EVERY TIME:
+# Step 2: Check endpoints
+kubectl get endpoints <service>
+# If empty → label mismatch
 
----
+# Step 3: Verify port configuration
+kubectl describe svc <service>
+# port (service port) vs targetPort (container port)
 
-### **🧠 1\. Identify layer**
+# Step 4: Test from within cluster
+kubectl exec -it <another-pod> -- curl http://<service-name>:<port>
 
-“First I identify where issue is…”
+# Step 5: Check readiness probe
+kubectl describe pod <pod>
+# Is pod actually Ready? (1/1 vs 0/1)
+```
 
----
+**Root causes to consider:**
+- Label mismatch → empty endpoints
+- Wrong targetPort → connection refused
+- Pod failing readiness probe → not added to endpoints
+- Service in wrong namespace
 
-### **🔍 2\. Step-by-step checks**
-
-pods → service → network → logs
-
----
-
-### **🛠️ 3\. Commands**
-
-Always say commands
-
----
-
-### **🎯 4\. Root cause thinking**
-
-“Possible reasons are…”
-
----
-
-### **✅ 5\. Resolution**
-
-“I fix by…”
+**Closing line:**
+> "A running pod doesn't mean a reachable service — I verify the full chain: pod readiness, label selectors, port mapping, and endpoints."
 
 ---
 
-# **💥 Now REAL Practice (INTERACTIVE)**
+## Quick Command Reference
 
-I’ll test you like interviewer 👇
+```bash
+# Pod debugging
+kubectl get pods
+kubectl describe pod <name>
+kubectl logs <pod>
+kubectl logs <pod> --previous
+kubectl exec -it <pod> -- sh
 
----
+# Service / Connectivity
+kubectl get svc
+kubectl get endpoints
+kubectl describe svc <name>
+kubectl get pods --show-labels
 
-## **🎯 QUESTION:**
+# Deployment
+kubectl describe deployment <name>
+kubectl rollout status deployment/<name>
+kubectl rollout history deployment/<name>
+kubectl rollout undo deployment/<name>
 
-Pod is running but service is not working.  
-What do you check?
+# Ingress
+kubectl get ingress
+kubectl describe ingress <name>
 
----
-
-👉 **Answer in your next message like real interview**
-
-I will:
-
-* correct you  
-* improve your answer  
-* push deeper
-
----
-
-Let’s make you **interview ready 💪**
-
+# Namespace-specific
+kubectl get pods -n <namespace>
+kubectl logs <pod> -n <namespace>
+```

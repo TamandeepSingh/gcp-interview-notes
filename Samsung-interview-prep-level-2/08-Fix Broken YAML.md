@@ -1,322 +1,229 @@
-Perfect — let’s do this like a **real interview practice**. I’ll train you exactly on what they will test 👇
+# Fix Broken YAML — Interview Practice
 
----
+## Round 1: Wrong targetPort
 
-# **🎯 🔥 ROUND 1: Fix Broken YAML (Service Issue)**
+**Question:** Your app is deployed but not accessible. What is wrong with this YAML?
 
-### **❓ Question:**
-
-Your app is deployed but not accessible.
-
-Here is the Service YAML:
-
-apiVersion: v1  
-kind: Service  
-metadata:  
-  name: my-service  
-spec:  
-  type: LoadBalancer  
-  selector:  
-    app: my-app  
-  ports:  
-    \- port: 80  
+**Service:**
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: my-app
+  ports:
+    - port: 80
       targetPort: 3000
+```
 
-Deployment YAML:
+**Deployment:**
+```yaml
+containers:
+  - name: app
+    image: nginx
+    ports:
+      - containerPort: 80
+```
 
-containers:  
-  \- name: app  
-    image: nginx  
-    ports:  
-      \- containerPort: 80
+**What is wrong?**
 
----
+The service is forwarding traffic to port `3000`, but the container is running on port `80`. Traffic never reaches the application.
 
-## **👉 Your Task:**
-
-1. What is wrong?  
-2. Why is app not accessible?  
-3. How will you fix it?
-
----
-
-## **✅ Correct Answer (what you should say)**
-
-### **🧠 Step 1: Identify issue**
-
-The service is forwarding traffic to port **3000**, but the container is running on port **80**.
-
----
-
-### **🧠 Step 2: Explain impact**
-
-Because of this mismatch, traffic never reaches the application container.
-
----
-
-### **🛠️ Step 3: Fix**
-
+**Fix:**
+```yaml
 targetPort: 80
+```
+
+**Strong interview line:**
+> "I always ensure the service `targetPort` matches the `containerPort` defined in the deployment."
 
 ---
 
-### **🎯 Strong interview line:**
+## Round 2: Label Mismatch
 
-I always ensure that the service targetPort matches the containerPort defined in the deployment.
+**Question:** Why is the service not working?
 
----
-
-# **🎯 🔥 ROUND 2: Label Mismatch (VERY COMMON)**
-
----
-
-### **❓ Question:**
-
-Service:
-
-selector:  
+**Service selector:**
+```yaml
+selector:
   app: my-app
+```
 
-Pod labels:
-
-labels:  
+**Pod labels:**
+```yaml
+labels:
   app: hello-app
+```
 
----
+**What is wrong?**
 
-## **👉 Your Task:**
+The service selector (`app: my-app`) does not match the pod labels (`app: hello-app`). Kubernetes cannot link the service to any pods — no traffic is routed.
 
-Why is service not working?
+**Fix:**
 
----
-
-## **✅ Correct Answer:**
-
-### **🧠 Issue:**
-
-The service selector does not match the pod labels.
-
----
-
-### **🧠 Impact:**
-
-Kubernetes cannot link the service to any pods, so no traffic is routed.
-
----
-
-### **🛠️ Fix:**
-
-Either:
-
-selector:  
+Either update the service selector:
+```yaml
+selector:
   app: hello-app
+```
 
-OR change pod label.
+Or update the pod label:
+```yaml
+labels:
+  app: my-app
+```
+
+**Verify fix:**
+```bash
+kubectl get endpoints my-service
+# Should now show pod IPs instead of being empty
+```
+
+**Strong interview line:**
+> "Services rely on label selectors for pod discovery — a label mismatch results in empty endpoints and no traffic routing."
 
 ---
 
-### **🎯 Strong line:**
+## Round 3: Missing Readiness Probe
 
-Services rely on label selectors, so matching labels is critical for connectivity.
+**Question:** What is missing from this deployment?
 
----
-
-# **🎯 🔥 ROUND 3: Missing Readiness Probe**
-
----
-
-### **❓ Question:**
-
-Deployment:
-
-containers:  
-  \- name: app  
+```yaml
+containers:
+  - name: app
     image: my-app
+```
+
+**What is missing?**
+
+No readiness probe is defined. Without it, Kubernetes may send traffic to a pod before the application has finished starting up.
+
+**Fix:**
+```yaml
+containers:
+  - name: app
+    image: my-app
+    readinessProbe:
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 10
+      periodSeconds: 10
+```
+
+**Strong interview line:**
+> "Readiness probes ensure traffic is only sent to pods that have successfully initialized. Without them, you get traffic routing failures during startup."
 
 ---
 
-## **👉 What is missing?**
+## Round 4: Pipeline Debug
 
----
+**Question:** Pipeline builds successfully but the app is not updated in the cluster. What do you check?
 
-## **✅ Answer:**
+**Step-by-step:**
 
-There is no readiness probe defined.
+```bash
+# Step 1: Check what image tag is actually deployed
+kubectl describe deployment <name>
+# Look for "Image:" field — compare to pipeline build tag
 
----
-
-### **🧠 Why important:**
-
-Without readiness probe, Kubernetes may send traffic to a pod before it is ready.
-
----
-
-### **🛠️ Fix:**
-
-readinessProbe:  
-  httpGet:  
-    path: /health  
-    port: 8080
-
----
-
-### **🎯 Strong line:**
-
-Readiness probes ensure traffic is only sent to healthy pods.
-
----
-
-# **🎯 🔥 ROUND 4: Pipeline Debug**
-
----
-
-### **❓ Question:**
-
-Pipeline builds successfully but app is not updated in cluster.
-
----
-
-## **👉 What do you check?**
-
----
-
-## **✅ Answer:**
-
-### **🧠 Step-by-step:**
-
-1. Check image tag used in deployment  
-2. Verify if new image was pushed  
-3. Check Kubernetes deployment:
-
-kubectl get deployment  
-kubectl describe deployment
-
-4. Check rollout:
-
+# Step 2: Check rollout status
 kubectl rollout status deployment/my-app
 
----
+# Step 3: Check pod status
+kubectl get pods
+kubectl describe pod <pod>
 
-### **🎯 Strong line:**
+# Step 4: Check deployment events
+kubectl describe deployment <name>
+```
 
-CI success doesn’t guarantee deployment success — I verify runtime state in Kubernetes.
+**Possible causes:**
+- Image tag not updated in deployment manifest
+- Deployment YAML not re-applied by pipeline
+- ArgoCD not synced to latest commit
+- `imagePullPolicy: IfNotPresent` using cached image
 
----
-
-# **🎯 🔥 ROUND 5: Pod Crash**
-
----
-
-### **❓ Question:**
-
-Pod is in `CrashLoopBackOff`
-
----
-
-## **👉 What do you do?**
+**Strong interview line:**
+> "CI success doesn't guarantee deployment success — I always verify what image tag is actually running in the cluster."
 
 ---
 
-## **✅ Answer:**
+## Round 5: CrashLoopBackOff
 
-kubectl describe pod \<pod\>  
-kubectl logs \<pod\>
+**Question:** A pod is in `CrashLoopBackOff`. How do you debug?
 
----
+```bash
+# Step 1: Get pod events
+kubectl describe pod <pod>
+# Look at Events section at the bottom
 
-### **🧠 Possible reasons:**
+# Step 2: Check container logs
+kubectl logs <pod>
 
-* wrong env variables  
-* app crash  
-* bad config
+# Step 3: Check previous container logs (if pod restarted)
+kubectl logs <pod> --previous
+```
 
----
+**Possible reasons:**
+- Application crash (unhandled exception, missing dependency)
+- Wrong environment variables
+- Bad config (missing required config file or secret)
+- Health probe misconfiguration causing restart loop
 
-### **🎯 Strong line:**
-
-I rely on pod logs and events to identify the root cause quickly.
-
----
-
-# **🎯 🔥 ROUND 6: Write Mini YAML**
-
----
-
-## **❓ Question:**
-
-Write a simple deployment with:
-
-* 2 replicas  
-* nginx  
-* port 80
+**Strong interview line:**
+> "Pod logs and events are the fastest way to identify the root cause of a crash — I always check both."
 
 ---
 
-## **✅ Answer:**
+## Round 6: Write a Deployment from Scratch
 
-apiVersion: apps/v1  
-kind: Deployment  
-metadata:  
-  name: nginx-deploy  
-spec:  
-  replicas: 2  
-  selector:  
-    matchLabels:  
-      app: nginx  
-  template:  
-    metadata:  
-      labels:  
-        app: nginx  
-    spec:  
-      containers:  
-        \- name: nginx  
-          image: nginx  
-          ports:  
-            \- containerPort: 80
+**Question:** Write a deployment with 2 replicas, nginx, port 80.
 
----
-
-# **🧠 HOW TO PRACTICE (VERY IMPORTANT)**
-
-Do this now:
-
----
-
-## **🧪 Practice Loop (repeat 3 times)**
-
-1. Read question  
-2. Speak answer OUT LOUD  
-3. Fix YAML mentally  
-4. Say commands
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deploy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+```
 
 ---
 
-# **🔥 REAL INTERVIEW TIP**
+## Answer Structure to Use Every Time
 
-When answering:
-
-👉 Always follow structure:
-
-“First I check…”  
-“Then I verify…”  
-“Possible reasons are…”  
-“I fix it by…”
-
----
-
-# **💥 NEXT LEVEL PRACTICE (HIGHLY RECOMMENDED)**
-
-Now let’s make it harder (real Samsung level):
-
-👉 I will:
-
-* interrupt you  
-* ask follow-ups  
-* give tricky scenarios
-
-Just say:
-
-👉 **“Start live mock interview”**
-
-I’ll simulate **90-min pressure round** 💪
-
+```
+"First I check..."    → identify the layer
+"Then I verify..."    → step-by-step checks with commands
+"Possible reasons are..."  → root cause analysis
+"I fix it by..."      → specific resolution
+```
